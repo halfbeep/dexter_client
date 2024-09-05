@@ -86,10 +86,10 @@ async fn stream_random_orders() {
         };
 
         // Generate a random price between 98.0 and 102.0, explicitly typed as f64
-        let price: f64 = rand::thread_rng().gen_range(98.0..=102.0);
+        let price: f64 = rand::thread_rng().gen_range(90.0..=110.0);
         let rounded_price = (price * 10.0).round() / 10.0;
 
-        let quantity: u32 = rand::thread_rng().gen_range(5..=25);
+        let quantity: u32 = rand::thread_rng().gen_range(1..=50);
 
         let order = Order {
             id, // Assign the generated unique ID as a String
@@ -110,8 +110,8 @@ async fn stream_random_orders() {
         // Print the sent order
         println!("Sent order: {:?}", order);
 
-        // Sleep for 100 milliseconds before sending the next order
-        sleep(Duration::from_millis(100)).await;
+        // Sleep for 10 milliseconds before sending the next order
+        sleep(Duration::from_millis(10)).await;
     }
 }
 
