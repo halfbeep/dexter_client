@@ -1,17 +1,22 @@
 use futures_util::{SinkExt, StreamExt};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use uuid::Uuid; // Import Uuid for generating unique IDs
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, serde::Deserialize, Debug)]
 struct Order {
-    id: String,          // Store the UUID as a String for serialization
+    id: String, // Store the UUID as a String for serialization
     order_type: String,
     price: f64,
     quantity: u32,
+}
+
+#[derive(serde::Deserialize)]
+struct MessageReceived {
+    status: String,
 }
 
 async fn stream_random_orders() {
@@ -20,7 +25,7 @@ async fn stream_random_orders() {
 
     // Connect to the WebSocket server
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect");
-    println!("Connected to WebSocket server");
+    println!("Connected to ws {}", url);
 
     // Split the WebSocket stream into the writer (for sending) and reader (for receiving)
     let (mut write, mut read) = ws_stream.split();
@@ -32,7 +37,9 @@ async fn stream_random_orders() {
         while let Some(message) = read.next().await {
             match message {
                 Ok(Message::Text(text)) => {
-                    println!("Received from server: {}", text);
+                    if let Ok(msgr) = serde_json::from_str::<MessageReceived>(&text) {
+                        println!("Received: {} \n", msgr.status);
+                    }
                 }
                 Ok(Message::Binary(bin)) => {
                     println!("Received binary data from server: {:?}", bin);
@@ -45,7 +52,10 @@ async fn stream_random_orders() {
                 }
                 Ok(Message::Close(close_frame)) => {
                     if let Some(cf) = close_frame {
-                        println!("Received Close frame: Code: {:?}, Reason: {}", cf.code, cf.reason);
+                        println!(
+                            "Received Close frame: Code: {:?}, Reason: {}",
+                            cf.code, cf.reason
+                        );
                     } else {
                         println!("Received Close frame with no information.");
                     }
@@ -74,17 +84,17 @@ async fn stream_random_orders() {
         } else {
             "Sell".to_string()
         };
-        
+
         // Generate a random price between 98.0 and 102.0, explicitly typed as f64
         let price: f64 = rand::thread_rng().gen_range(98.0..=102.0);
         let rounded_price = (price * 10.0).round() / 10.0;
-        
+
         let quantity: u32 = rand::thread_rng().gen_range(5..=25);
 
         let order = Order {
             id, // Assign the generated unique ID as a String
             order_type,
-            price: rounded_price,  // Use the rounded price
+            price: rounded_price, // Use the rounded price
             quantity,
         };
 
@@ -92,13 +102,16 @@ async fn stream_random_orders() {
         let order_json = serde_json::to_string(&order).unwrap();
 
         // Send the order as a WebSocket message
-        write.send(Message::Text(order_json.clone())).await.expect("Failed to send message");
+        write
+            .send(Message::Text(order_json.clone()))
+            .await
+            .expect("Failed to send message");
 
         // Print the sent order
         println!("Sent order: {:?}", order);
 
-        // Sleep for 250 milliseconds before sending the next order
-        sleep(Duration::from_millis(250)).await;
+        // Sleep for 100 milliseconds before sending the next order
+        sleep(Duration::from_millis(100)).await;
     }
 }
 
